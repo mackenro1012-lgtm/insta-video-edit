@@ -34,8 +34,8 @@ function buildFilterChain(
     const textFile = escapeDrawtextValue(`ov${index}.txt`);
     const fontFile = escapeDrawtextValue(FONT_FS_NAME);
     const color = escapeDrawtextValue(overlay.color);
-    const x = `(iw*${overlay.x.toFixed(4)}-text_w/2)`;
-    const y = `(ih*${overlay.y.toFixed(4)}-text_h/2)`;
+    const x = `main_w*${overlay.x.toFixed(4)}-text_w/2`;
+    const y = `main_h*${overlay.y.toFixed(4)}-text_h/2`;
     const start = Math.max(0, overlay.startTime).toFixed(3);
     const end = Math.max(0, overlay.endTime).toFixed(3);
     parts.push(

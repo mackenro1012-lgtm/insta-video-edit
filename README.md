@@ -1,32 +1,30 @@
-# React + TypeScript + Vite
+# Reel Studio
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Instagramのリール風の縦型動画を、ブラウザだけで編集できるWebアプリです。
 
-Currently, two official plugins are available:
+## 機能
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- 動画のアップロード(ドラッグ&ドロップ対応)
+- トリミング(開始・終了ポイントの調整、タイムラインのシークバー)
+- テキストオーバーレイ(ドラッグで位置調整、色・サイズ・表示時間の指定、日本語対応)
+- Instagram風フィルタープリセット + 明るさ/コントラスト/彩度の個別調整
+- MP4形式での書き出し(ブラウザ内蔵のffmpeg.wasmによる処理。サーバー送信なし)
 
-## React Compiler
+## 開発
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## ビルド
+
+```bash
+npm run build
+```
+
+## 技術スタック
+
+- Vite + React + TypeScript
+- Tailwind CSS
+- [@ffmpeg/ffmpeg](https://github.com/ffmpegwasm/ffmpeg.wasm)(クライアントサイドでの動画書き出し。コアファイルはCDNではなくアプリにバンドル)
