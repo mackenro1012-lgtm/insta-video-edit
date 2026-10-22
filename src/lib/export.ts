@@ -42,12 +42,17 @@ function drawtextFilter(
   return `drawtext=fontfile=${fontFile}:textfile=${textFile}:fontsize=${fontSizePx}:fontcolor=${color}:borderw=2:bordercolor=black@0.6:x=${x}:y=${y}:enable='between(t,${start},${end})'`;
 }
 
+// Real-world phone footage is often variable-frame-rate. Without normalizing to a
+// constant rate up front, ffmpeg has to pad gaps with duplicate frames downstream
+// (in trim/concat especially), which can be extremely slow or destabilize the encode.
+const FPS_NORMALIZE = 'fps=30';
+
 function buildSimpleFilterChain(
   filters: FilterSettings,
   overlays: TextOverlay[],
   videoWidth: number,
 ): string {
-  const parts: string[] = [ffmpegEqArgs(filters)];
+  const parts: string[] = [FPS_NORMALIZE, ffmpegEqArgs(filters)];
   overlays.forEach((overlay, index) => {
     if (!overlay.text.trim()) return;
     parts.push(drawtextFilter(overlay, index, videoWidth, overlay.startTime, overlay.endTime));
@@ -66,12 +71,15 @@ function buildSilenceRemovalFilterComplex(
   overlays: TextOverlay[],
   videoWidth: number,
 ): string {
-  const parts: string[] = [];
+  const splitLabels = keepSegments.map((_, i) => `vnorm${i}`);
+  const parts: string[] = [
+    `[0:v]${FPS_NORMALIZE},split=${keepSegments.length}${splitLabels.map((l) => `[${l}]`).join('')}`,
+  ];
   const concatInputs: string[] = [];
 
   keepSegments.forEach((seg, i) => {
     parts.push(
-      `[0:v]trim=start=${seg.start.toFixed(3)}:end=${seg.end.toFixed(3)},setpts=PTS-STARTPTS[v${i}]`,
+      `[${splitLabels[i]}]trim=start=${seg.start.toFixed(3)}:end=${seg.end.toFixed(3)},setpts=PTS-STARTPTS[v${i}]`,
     );
     parts.push(
       `[0:a]atrim=start=${seg.start.toFixed(3)}:end=${seg.end.toFixed(3)},asetpts=PTS-STARTPTS[a${i}]`,
