@@ -39,4 +39,24 @@ export interface TrimRange {
   end: number;
 }
 
-export type ExportStage = 'idle' | 'loading-ffmpeg' | 'processing' | 'done' | 'error';
+export interface SilenceRemovalSettings {
+  enabled: boolean;
+  /** dBFS threshold below which audio is considered silent (negative number, e.g. -30) */
+  thresholdDb: number;
+  /** minimum duration in seconds for a quiet stretch to count as silence */
+  minDurationSec: number;
+}
+
+export const DEFAULT_SILENCE_REMOVAL: SilenceRemovalSettings = {
+  enabled: false,
+  thresholdDb: -30,
+  minDurationSec: 0.5,
+};
+
+export type ExportStage =
+  | 'idle'
+  | 'loading-ffmpeg'
+  | 'analyzing'
+  | 'processing'
+  | 'done'
+  | 'error';

@@ -6,8 +6,14 @@ import TextOverlayPanel from './components/TextOverlayPanel';
 import FilterPanel from './components/FilterPanel';
 import ExportPanel from './components/ExportPanel';
 import { exportVideo } from './lib/export';
-import { DEFAULT_FILTERS } from './types';
-import type { ExportStage, FilterSettings, TextOverlay, TrimRange } from './types';
+import { DEFAULT_FILTERS, DEFAULT_SILENCE_REMOVAL } from './types';
+import type {
+  ExportStage,
+  FilterSettings,
+  SilenceRemovalSettings,
+  TextOverlay,
+  TrimRange,
+} from './types';
 
 type Tab = 'text' | 'filter' | 'export';
 
@@ -43,6 +49,9 @@ export default function App() {
   const [exportProgress, setExportProgress] = useState(0);
   const [exportError, setExportError] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [silenceRemoval, setSilenceRemoval] = useState<SilenceRemovalSettings>(
+    DEFAULT_SILENCE_REMOVAL,
+  );
 
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -58,6 +67,7 @@ export default function App() {
     setThumbnailSrc(null);
     setExportStage('idle');
     setResultUrl(null);
+    setSilenceRemoval(DEFAULT_SILENCE_REMOVAL);
   }
 
   function handleLoadedMetadata(meta: { duration: number; width: number; height: number }) {
@@ -141,6 +151,8 @@ export default function App() {
         overlays,
         videoWidth: videoMeta.width,
         videoHeight: videoMeta.height,
+        silenceRemoval,
+        onStage: setExportStage,
         onProgress: (ratio) => {
           setExportStage('processing');
           setExportProgress(ratio);
@@ -257,6 +269,8 @@ export default function App() {
               progress={exportProgress}
               errorMessage={exportError}
               resultUrl={resultUrl}
+              silenceRemoval={silenceRemoval}
+              onSilenceRemovalChange={setSilenceRemoval}
               onExport={handleExport}
               onReset={handleReset}
             />

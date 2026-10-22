@@ -1,7 +1,8 @@
 import { fetchFile } from '@ffmpeg/util';
-import type { FilterSettings, TextOverlay, TrimRange } from '../types';
+import type { FilterSettings, SilenceRemovalSettings, TextOverlay, TrimRange } from '../types';
 import { getFFmpeg } from './ffmpeg';
 import { ffmpegEqArgs } from './filters';
+import { computeKeepSegments, detectSilence, remapTimeAfterCuts, type TimeRange } from './silence';
 
 const FONT_PATH = '/fonts/NotoSansJP-Variable.ttf';
 const FONT_FS_NAME = 'overlay-font.ttf';
@@ -13,7 +14,9 @@ export interface ExportOptions {
   overlays: TextOverlay[];
   videoWidth: number;
   videoHeight: number;
+  silenceRemoval: SilenceRemovalSettings;
   onProgress?: (ratio: number) => void;
+  onStage?: (stage: 'analyzing' | 'processing') => void;
 }
 
 function escapeDrawtextValue(value: string): string {
@@ -21,33 +24,85 @@ function escapeDrawtextValue(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/:/g, '\\:').replace(/'/g, "\\'");
 }
 
-function buildFilterChain(
+function drawtextFilter(
+  overlay: TextOverlay,
+  index: number,
+  videoWidth: number,
+  startTime: number,
+  endTime: number,
+): string {
+  const fontSizePx = Math.max(8, Math.round((overlay.fontSize * videoWidth) / 1080));
+  const textFile = escapeDrawtextValue(`ov${index}.txt`);
+  const fontFile = escapeDrawtextValue(FONT_FS_NAME);
+  const color = escapeDrawtextValue(overlay.color);
+  const x = `main_w*${overlay.x.toFixed(4)}-text_w/2`;
+  const y = `main_h*${overlay.y.toFixed(4)}-text_h/2`;
+  const start = Math.max(0, startTime).toFixed(3);
+  const end = Math.max(0, endTime).toFixed(3);
+  return `drawtext=fontfile=${fontFile}:textfile=${textFile}:fontsize=${fontSizePx}:fontcolor=${color}:borderw=2:bordercolor=black@0.6:x=${x}:y=${y}:enable='between(t,${start},${end})'`;
+}
+
+function buildSimpleFilterChain(
   filters: FilterSettings,
   overlays: TextOverlay[],
   videoWidth: number,
 ): string {
   const parts: string[] = [ffmpegEqArgs(filters)];
-
   overlays.forEach((overlay, index) => {
     if (!overlay.text.trim()) return;
-    const fontSizePx = Math.max(8, Math.round((overlay.fontSize * videoWidth) / 1080));
-    const textFile = escapeDrawtextValue(`ov${index}.txt`);
-    const fontFile = escapeDrawtextValue(FONT_FS_NAME);
-    const color = escapeDrawtextValue(overlay.color);
-    const x = `main_w*${overlay.x.toFixed(4)}-text_w/2`;
-    const y = `main_h*${overlay.y.toFixed(4)}-text_h/2`;
-    const start = Math.max(0, overlay.startTime).toFixed(3);
-    const end = Math.max(0, overlay.endTime).toFixed(3);
-    parts.push(
-      `drawtext=fontfile=${fontFile}:textfile=${textFile}:fontsize=${fontSizePx}:fontcolor=${color}:borderw=2:bordercolor=black@0.6:x=${x}:y=${y}:enable='between(t,${start},${end})'`,
-    );
+    parts.push(drawtextFilter(overlay, index, videoWidth, overlay.startTime, overlay.endTime));
   });
-
   return parts.join(',');
 }
 
+/**
+ * Builds a filter_complex that trims out the given keep segments (in the original
+ * file's own timeline) and concatenates what remains, then applies the color/text
+ * filters on top of the concatenated (silence-free) result.
+ */
+function buildSilenceRemovalFilterComplex(
+  keepSegments: TimeRange[],
+  filters: FilterSettings,
+  overlays: TextOverlay[],
+  videoWidth: number,
+): string {
+  const parts: string[] = [];
+  const concatInputs: string[] = [];
+
+  keepSegments.forEach((seg, i) => {
+    parts.push(
+      `[0:v]trim=start=${seg.start.toFixed(3)}:end=${seg.end.toFixed(3)},setpts=PTS-STARTPTS[v${i}]`,
+    );
+    parts.push(
+      `[0:a]atrim=start=${seg.start.toFixed(3)}:end=${seg.end.toFixed(3)},asetpts=PTS-STARTPTS[a${i}]`,
+    );
+    concatInputs.push(`[v${i}][a${i}]`);
+  });
+  parts.push(`${concatInputs.join('')}concat=n=${keepSegments.length}:v=1:a=1[vcat][acat]`);
+
+  let videoLabel = 'vcat';
+  parts.push(`[${videoLabel}]${ffmpegEqArgs(filters)}[veq]`);
+  videoLabel = 'veq';
+
+  overlays.forEach((overlay, index) => {
+    if (!overlay.text.trim()) return;
+    const newStart = remapTimeAfterCuts(overlay.startTime, keepSegments);
+    const newEnd = remapTimeAfterCuts(overlay.endTime, keepSegments);
+    const outLabel = `t${index}`;
+    parts.push(
+      `[${videoLabel}]${drawtextFilter(overlay, index, videoWidth, newStart, newEnd)}[${outLabel}]`,
+    );
+    videoLabel = outLabel;
+  });
+
+  parts.push(`[${videoLabel}]null[vout]`);
+
+  return parts.join(';');
+}
+
 export async function exportVideo(options: ExportOptions): Promise<Blob> {
-  const { file, trim, filters, overlays, videoWidth, onProgress } = options;
+  const { file, trim, filters, overlays, videoWidth, silenceRemoval, onProgress, onStage } =
+    options;
   const ffmpeg = await getFFmpeg();
 
   const logLines: string[] = [];
@@ -74,29 +129,67 @@ export async function exportVideo(options: ExportOptions): Promise<Blob> {
 
   const duration = Math.max(0.1, trim.end - trim.start);
   const outputName = 'output.mp4';
-  const filterChain = buildFilterChain(filters, overlays, videoWidth);
 
-  const exitCode = await ffmpeg.exec([
-    '-ss',
-    trim.start.toFixed(3),
-    '-i',
-    inputName,
-    '-t',
-    duration.toFixed(3),
-    '-vf',
-    filterChain,
-    '-c:v',
-    'libx264',
-    '-preset',
-    'veryfast',
-    '-crf',
-    '23',
-    '-c:a',
-    'aac',
-    '-movflags',
-    '+faststart',
-    outputName,
-  ]);
+  let execArgs: string[];
+
+  if (silenceRemoval.enabled) {
+    onStage?.('analyzing');
+    const silentRanges = await detectSilence(ffmpeg, inputName, trim, silenceRemoval);
+    const keepSegments = computeKeepSegments(silentRanges, duration).map((seg) => ({
+      start: seg.start + trim.start,
+      end: seg.end + trim.start,
+    }));
+
+    onStage?.('processing');
+    const filterComplex = buildSilenceRemovalFilterComplex(keepSegments, filters, overlays, videoWidth);
+    execArgs = [
+      '-i',
+      inputName,
+      '-filter_complex',
+      filterComplex,
+      '-map',
+      '[vout]',
+      '-map',
+      '[acat]',
+      '-c:v',
+      'libx264',
+      '-preset',
+      'veryfast',
+      '-crf',
+      '23',
+      '-c:a',
+      'aac',
+      '-movflags',
+      '+faststart',
+      outputName,
+    ];
+  } else {
+    onStage?.('processing');
+    const filterChain = buildSimpleFilterChain(filters, overlays, videoWidth);
+    execArgs = [
+      '-ss',
+      trim.start.toFixed(3),
+      '-i',
+      inputName,
+      '-t',
+      duration.toFixed(3),
+      '-vf',
+      filterChain,
+      '-c:v',
+      'libx264',
+      '-preset',
+      'veryfast',
+      '-crf',
+      '23',
+      '-c:a',
+      'aac',
+      '-movflags',
+      '+faststart',
+      outputName,
+    ];
+  }
+
+  const exitCode = await ffmpeg.exec(execArgs);
 
   ffmpeg.off('log', onLog);
 
