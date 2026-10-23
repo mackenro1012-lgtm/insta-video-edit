@@ -47,6 +47,22 @@ function drawtextFilter(
 // (in trim/concat especially), which can be extremely slow or destabilize the encode.
 const FPS_NORMALIZE = 'fps=30';
 
+// Phone video is almost universally BT.709 SDR, but ffmpeg doesn't reliably carry the
+// source's color tags through our filter graph — left unset, it has fallen back to
+// unrelated defaults (seen in testing as "bt470bg/unknown/unknown"), which makes
+// players apply the wrong YUV->RGB matrix and wash out/shift the colors on playback.
+// Tagging the output explicitly avoids that mismatch.
+const COLOR_TAG_ARGS = [
+  '-colorspace',
+  'bt709',
+  '-color_primaries',
+  'bt709',
+  '-color_trc',
+  'bt709',
+  '-color_range',
+  'tv',
+];
+
 function buildSimpleFilterChain(
   filters: FilterSettings,
   overlays: TextOverlay[],
@@ -168,6 +184,7 @@ export async function exportVideo(options: ExportOptions): Promise<Blob> {
       'veryfast',
       '-crf',
       '18',
+      ...COLOR_TAG_ARGS,
       '-c:a',
       'aac',
       cleanName,
@@ -204,6 +221,7 @@ export async function exportVideo(options: ExportOptions): Promise<Blob> {
       'veryfast',
       '-crf',
       '23',
+      ...COLOR_TAG_ARGS,
       '-c:a',
       'aac',
       '-movflags',
@@ -228,6 +246,7 @@ export async function exportVideo(options: ExportOptions): Promise<Blob> {
       'veryfast',
       '-crf',
       '23',
+      ...COLOR_TAG_ARGS,
       '-c:a',
       'aac',
       '-movflags',
