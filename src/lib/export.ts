@@ -145,18 +145,53 @@ export async function exportVideo(options: ExportOptions): Promise<Blob> {
   let execArgs: string[];
 
   if (silenceRemoval.enabled) {
+    // Real-world files (especially ones that have been re-shared/re-encoded through
+    // other apps) can have small bitstream irregularities that a normal sequential
+    // decode glosses over but that the seek-heavy trim/concat graph below hits harder,
+    // aborting the whole encode. Re-encoding once up front with the same simple,
+    // reliable single-pass path we already use for plain exports "sanitizes" the
+    // stream before we start slicing it into pieces.
+    onStage?.('processing');
+    const cleanName = 'clean.mp4';
+    const sanitizeExitCode = await ffmpeg.exec([
+      '-ss',
+      trim.start.toFixed(3),
+      '-i',
+      inputName,
+      '-t',
+      duration.toFixed(3),
+      '-vf',
+      FPS_NORMALIZE,
+      '-c:v',
+      'libx264',
+      '-preset',
+      'veryfast',
+      '-crf',
+      '18',
+      '-c:a',
+      'aac',
+      cleanName,
+    ]);
+    if (sanitizeExitCode !== 0) {
+      ffmpeg.off('log', onLog);
+      const tail = logLines.slice(-60).join('\n');
+      throw new Error(`ffmpeg failed to normalize input (exit ${sanitizeExitCode}):\n${tail}`);
+    }
+
     onStage?.('analyzing');
-    const silentRanges = await detectSilence(ffmpeg, inputName, trim, silenceRemoval);
-    const keepSegments = computeKeepSegments(silentRanges, duration).map((seg) => ({
-      start: seg.start + trim.start,
-      end: seg.end + trim.start,
-    }));
+    const silentRanges = await detectSilence(
+      ffmpeg,
+      cleanName,
+      { start: 0, end: duration },
+      silenceRemoval,
+    );
+    const keepSegments = computeKeepSegments(silentRanges, duration);
 
     onStage?.('processing');
     const filterComplex = buildSilenceRemovalFilterComplex(keepSegments, filters, overlays, videoWidth);
     execArgs = [
       '-i',
-      inputName,
+      cleanName,
       '-filter_complex',
       filterComplex,
       '-map',
