@@ -71,18 +71,22 @@ function buildSilenceRemovalFilterComplex(
   overlays: TextOverlay[],
   videoWidth: number,
 ): string {
-  const splitLabels = keepSegments.map((_, i) => `vnorm${i}`);
+  const vSplitLabels = keepSegments.map((_, i) => `vnorm${i}`);
+  const aSplitLabels = keepSegments.map((_, i) => `anorm${i}`);
   const parts: string[] = [
-    `[0:v]${FPS_NORMALIZE},split=${keepSegments.length}${splitLabels.map((l) => `[${l}]`).join('')}`,
+    `[0:v]${FPS_NORMALIZE},split=${keepSegments.length}${vSplitLabels.map((l) => `[${l}]`).join('')}`,
+    // Real-world audio timestamps can drift or jump (common with phone recordings);
+    // aresample with async smooths that out before we start slicing/joining pieces.
+    `[0:a]aresample=async=1:first_pts=0,asplit=${keepSegments.length}${aSplitLabels.map((l) => `[${l}]`).join('')}`,
   ];
   const concatInputs: string[] = [];
 
   keepSegments.forEach((seg, i) => {
     parts.push(
-      `[${splitLabels[i]}]trim=start=${seg.start.toFixed(3)}:end=${seg.end.toFixed(3)},setpts=PTS-STARTPTS[v${i}]`,
+      `[${vSplitLabels[i]}]trim=start=${seg.start.toFixed(3)}:end=${seg.end.toFixed(3)},setpts=PTS-STARTPTS[v${i}]`,
     );
     parts.push(
-      `[0:a]atrim=start=${seg.start.toFixed(3)}:end=${seg.end.toFixed(3)},asetpts=PTS-STARTPTS[a${i}]`,
+      `[${aSplitLabels[i]}]atrim=start=${seg.start.toFixed(3)}:end=${seg.end.toFixed(3)},asetpts=PTS-STARTPTS[a${i}]`,
     );
     concatInputs.push(`[v${i}][a${i}]`);
   });
@@ -203,8 +207,12 @@ export async function exportVideo(options: ExportOptions): Promise<Blob> {
 
   const data = await ffmpeg.readFile(outputName);
   if (exitCode !== 0 || data.length === 0) {
-    const tail = logLines.slice(-20).join('\n');
-    throw new Error(`ffmpeg failed (exit ${exitCode}, output ${data.length} bytes):\n${tail}`);
+    // Keep the input stream info near the top (codec/resolution/sample rate — useful
+    // for diagnosing) plus a generous tail around where the failure actually happened.
+    const head = logLines.slice(0, 15);
+    const tail = logLines.slice(-60);
+    const log = [...head, '...', ...tail].join('\n');
+    throw new Error(`ffmpeg failed (exit ${exitCode}, output ${data.length} bytes):\n${log}`);
   }
 
   return new Blob([new Uint8Array(data as Uint8Array)], { type: 'video/mp4' });
