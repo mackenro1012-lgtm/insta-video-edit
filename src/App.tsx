@@ -6,7 +6,8 @@ import TextOverlayPanel from './components/TextOverlayPanel';
 import FilterPanel from './components/FilterPanel';
 import ExportPanel from './components/ExportPanel';
 import { exportVideo } from './lib/export';
-import { DEFAULT_FILTERS, DEFAULT_SILENCE_REMOVAL } from './types';
+import { transcribeVideo } from './lib/transcribe';
+import { DEFAULT_EXPORT_CRF, DEFAULT_FILTERS, DEFAULT_SILENCE_REMOVAL } from './types';
 import type {
   ExportStage,
   FilterSettings,
@@ -27,6 +28,19 @@ function createOverlay(duration: number): TextOverlay {
     color: '#ffffff',
     startTime: 0,
     endTime: Math.max(1, duration),
+  };
+}
+
+function createCaptionOverlay(text: string, startTime: number, endTime: number): TextOverlay {
+  return {
+    id: crypto.randomUUID(),
+    text,
+    x: 0.5,
+    y: 0.85,
+    fontSize: 52,
+    color: '#ffffff',
+    startTime,
+    endTime,
   };
 }
 
@@ -52,6 +66,8 @@ export default function App() {
   const [silenceRemoval, setSilenceRemoval] = useState<SilenceRemovalSettings>(
     DEFAULT_SILENCE_REMOVAL,
   );
+  const [qualityCrf, setQualityCrf] = useState<number>(DEFAULT_EXPORT_CRF);
+  const [autoCaptionStatus, setAutoCaptionStatus] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -68,6 +84,8 @@ export default function App() {
     setExportStage('idle');
     setResultUrl(null);
     setSilenceRemoval(DEFAULT_SILENCE_REMOVAL);
+    setQualityCrf(DEFAULT_EXPORT_CRF);
+    setAutoCaptionStatus(null);
   }
 
   function handleLoadedMetadata(meta: { duration: number; width: number; height: number }) {
@@ -127,6 +145,38 @@ export default function App() {
     setTab('text');
   }
 
+  async function handleAutoCaption() {
+    if (!file) return;
+    try {
+      setAutoCaptionStatus('準備中...');
+      const segments = await transcribeVideo(file, trim, (p) => {
+        if (p.stage === 'loading-model') {
+          setAutoCaptionStatus(
+            p.ratio ? `モデルを準備中... ${Math.round(p.ratio * 100)}%` : 'モデルを準備中...',
+          );
+        } else if (p.stage === 'extracting-audio') {
+          setAutoCaptionStatus('音声を解析中...');
+        } else {
+          setAutoCaptionStatus('文字起こし中...');
+        }
+      });
+      if (segments.length === 0) {
+        setAutoCaptionStatus(null);
+        return;
+      }
+      const newOverlays = segments.map((seg) => createCaptionOverlay(seg.text, seg.start, seg.end));
+      setOverlays((prev) => [...prev, ...newOverlays]);
+      setSelectedOverlayId(newOverlays[0].id);
+      setAutoCaptionStatus(null);
+    } catch (err) {
+      console.error(err);
+      setAutoCaptionStatus(null);
+      window.alert(
+        `自動字幕の生成に失敗しました: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
   function handleChangeOverlay(id: string, patch: Partial<TextOverlay>) {
     setOverlays((prev) => prev.map((o) => (o.id === id ? { ...o, ...patch } : o)));
   }
@@ -152,6 +202,7 @@ export default function App() {
         videoWidth: videoMeta.width,
         videoHeight: videoMeta.height,
         silenceRemoval,
+        qualityCrf,
         onStage: setExportStage,
         onProgress: (ratio) => {
           setExportStage('processing');
@@ -258,6 +309,8 @@ export default function App() {
               onAdd={handleAddOverlay}
               onChange={handleChangeOverlay}
               onDelete={handleDeleteOverlay}
+              onAutoCaption={handleAutoCaption}
+              autoCaptionStatus={autoCaptionStatus}
             />
           )}
           {tab === 'filter' && (
@@ -271,6 +324,8 @@ export default function App() {
               resultUrl={resultUrl}
               silenceRemoval={silenceRemoval}
               onSilenceRemovalChange={setSilenceRemoval}
+              qualityCrf={qualityCrf}
+              onQualityCrfChange={setQualityCrf}
               onExport={handleExport}
               onReset={handleReset}
             />

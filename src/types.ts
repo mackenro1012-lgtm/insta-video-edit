@@ -60,3 +60,12 @@ export type ExportStage =
   | 'processing'
   | 'done'
   | 'error';
+
+/**
+ * ffmpeg's CRF value for the final encode: lower = higher quality & larger file,
+ * higher = more compression & smaller file. 18 is near-visually-lossless, 28 is
+ * noticeably soft. Kept deliberately narrow so every setting still looks reasonable.
+ */
+export const EXPORT_QUALITY_MIN_CRF = 18;
+export const EXPORT_QUALITY_MAX_CRF = 30;
+export const DEFAULT_EXPORT_CRF = 23;

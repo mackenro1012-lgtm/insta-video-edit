@@ -8,6 +8,8 @@ interface TextOverlayPanelProps {
   onAdd: () => void;
   onChange: (id: string, patch: Partial<TextOverlay>) => void;
   onDelete: (id: string) => void;
+  onAutoCaption: () => void;
+  autoCaptionStatus: string | null;
 }
 
 const COLORS = ['#ffffff', '#000000', '#ff3040', '#ffdd00', '#00e0a4', '#4e7bff'];
@@ -20,6 +22,8 @@ export default function TextOverlayPanel({
   onAdd,
   onChange,
   onDelete,
+  onAutoCaption,
+  autoCaptionStatus,
 }: TextOverlayPanelProps) {
   const selected = overlays.find((o) => o.id === selectedId) ?? null;
 
@@ -33,6 +37,19 @@ export default function TextOverlayPanel({
         >
           + 追加
         </button>
+      </div>
+
+      <div className="rounded-lg bg-neutral-800 p-3">
+        <button
+          onClick={onAutoCaption}
+          disabled={autoCaptionStatus !== null}
+          className="w-full rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 py-2 text-xs font-semibold text-white disabled:opacity-50"
+        >
+          {autoCaptionStatus ?? '🎙 自動字幕を生成'}
+        </button>
+        <p className="mt-1 text-[11px] text-neutral-500">
+          音声を自動で聞き取ってテロップを作成します(初回はモデルのダウンロードに少し時間がかかります)
+        </p>
       </div>
 
       {overlays.length > 0 && (

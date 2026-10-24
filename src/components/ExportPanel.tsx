@@ -1,3 +1,4 @@
+import { EXPORT_QUALITY_MAX_CRF, EXPORT_QUALITY_MIN_CRF } from '../types';
 import type { ExportStage, SilenceRemovalSettings } from '../types';
 
 interface ExportPanelProps {
@@ -7,8 +8,19 @@ interface ExportPanelProps {
   resultUrl: string | null;
   silenceRemoval: SilenceRemovalSettings;
   onSilenceRemovalChange: (settings: SilenceRemovalSettings) => void;
+  qualityCrf: number;
+  onQualityCrfChange: (crf: number) => void;
   onExport: () => void;
   onReset: () => void;
+}
+
+const CRF_RANGE = EXPORT_QUALITY_MAX_CRF - EXPORT_QUALITY_MIN_CRF;
+
+function qualityLabel(crf: number): string {
+  const percent = Math.round(((EXPORT_QUALITY_MAX_CRF - crf) / CRF_RANGE) * 100);
+  if (percent >= 80) return `高画質(${percent})`;
+  if (percent <= 20) return `軽量(${percent})`;
+  return `標準(${percent})`;
 }
 
 export default function ExportPanel({
@@ -18,6 +30,8 @@ export default function ExportPanel({
   resultUrl,
   silenceRemoval,
   onSilenceRemovalChange,
+  qualityCrf,
+  onQualityCrfChange,
   onExport,
   onReset,
 }: ExportPanelProps) {
@@ -49,6 +63,25 @@ export default function ExportPanel({
 
   return (
     <div className="flex flex-col gap-4 p-4">
+      <div className="rounded-lg bg-neutral-800 p-3">
+        <label className="mb-1 block text-xs text-neutral-400">
+          画質: {qualityLabel(qualityCrf)}
+        </label>
+        <input
+          type="range"
+          min={0}
+          max={CRF_RANGE}
+          value={EXPORT_QUALITY_MAX_CRF - qualityCrf}
+          disabled={isBusy}
+          onChange={(e) => onQualityCrfChange(EXPORT_QUALITY_MAX_CRF - Number(e.target.value))}
+          className="w-full"
+        />
+        <div className="flex justify-between text-[11px] text-neutral-500">
+          <span>軽量(ファイル小)</span>
+          <span>高画質(ファイル大)</span>
+        </div>
+      </div>
+
       <div className="rounded-lg bg-neutral-800 p-3">
         <label className="flex items-center justify-between gap-2">
           <span className="text-sm text-neutral-200">無音部分を自動でカット</span>

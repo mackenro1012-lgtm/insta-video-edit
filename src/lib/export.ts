@@ -1,4 +1,5 @@
 import { fetchFile } from '@ffmpeg/util';
+import { DEFAULT_EXPORT_CRF } from '../types';
 import type { FilterSettings, SilenceRemovalSettings, TextOverlay, TrimRange } from '../types';
 import { getFFmpeg } from './ffmpeg';
 import { ffmpegEqArgs } from './filters';
@@ -15,6 +16,8 @@ export interface ExportOptions {
   videoWidth: number;
   videoHeight: number;
   silenceRemoval: SilenceRemovalSettings;
+  /** ffmpeg CRF for the final encode; lower = higher quality & larger file. */
+  qualityCrf?: number;
   onProgress?: (ratio: number) => void;
   onStage?: (stage: 'analyzing' | 'processing') => void;
 }
@@ -129,8 +132,17 @@ function buildSilenceRemovalFilterComplex(
 }
 
 export async function exportVideo(options: ExportOptions): Promise<Blob> {
-  const { file, trim, filters, overlays, videoWidth, silenceRemoval, onProgress, onStage } =
-    options;
+  const {
+    file,
+    trim,
+    filters,
+    overlays,
+    videoWidth,
+    silenceRemoval,
+    qualityCrf = DEFAULT_EXPORT_CRF,
+    onProgress,
+    onStage,
+  } = options;
   const ffmpeg = await getFFmpeg();
 
   const logLines: string[] = [];
@@ -220,7 +232,7 @@ export async function exportVideo(options: ExportOptions): Promise<Blob> {
       '-preset',
       'veryfast',
       '-crf',
-      '23',
+      String(qualityCrf),
       ...COLOR_TAG_ARGS,
       '-c:a',
       'aac',
@@ -245,7 +257,7 @@ export async function exportVideo(options: ExportOptions): Promise<Blob> {
       '-preset',
       'veryfast',
       '-crf',
-      '23',
+      String(qualityCrf),
       ...COLOR_TAG_ARGS,
       '-c:a',
       'aac',
