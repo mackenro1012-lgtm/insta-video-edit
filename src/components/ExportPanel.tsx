@@ -17,8 +17,9 @@ interface ExportPanelProps {
 const CRF_RANGE = EXPORT_QUALITY_MAX_CRF - EXPORT_QUALITY_MIN_CRF;
 
 function qualityLabel(crf: number): string {
+  if (crf <= EXPORT_QUALITY_MIN_CRF) return 'ロスレス(無圧縮・ファイル特大)';
   const percent = Math.round(((EXPORT_QUALITY_MAX_CRF - crf) / CRF_RANGE) * 100);
-  if (percent >= 80) return `高画質(${percent})`;
+  if (percent >= 90) return `高画質(${percent})`;
   if (percent <= 20) return `軽量(${percent})`;
   return `標準(${percent})`;
 }
@@ -80,6 +81,11 @@ export default function ExportPanel({
           <span>軽量(ファイル小)</span>
           <span>高画質(ファイル大)</span>
         </div>
+        {qualityCrf <= EXPORT_QUALITY_MIN_CRF && (
+          <p className="mt-1 text-[11px] text-yellow-500">
+            ロスレス設定です。画質の劣化は実質ありませんが、ファイルサイズが非常に大きくなり、書き出しにも時間がかかります
+          </p>
+        )}
       </div>
 
       <div className="rounded-lg bg-neutral-800 p-3">
