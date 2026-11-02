@@ -4,12 +4,12 @@
   "location": "茨城県常陸大宮市",
   "note": "※当院の考え方です。個人差があります",
   "palette": {
-    "coverBg": "#5f7468",
-    "bg": "#eef1ec",
-    "ink": "#2f3a34",
-    "mid": "#5b655f",
-    "dim": "#aab3ac",
-    "accent": "#9c6b2f"
+    "coverBg": "#7f9686",
+    "bg": "#f3f5f0",
+    "ink": "#34413a",
+    "mid": "#626d66",
+    "dim": "#b3bab4",
+    "accent": "#8a6a3b"
   },
   "slides": [
     {
