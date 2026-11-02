@@ -39,7 +39,7 @@ const types = {
       const col = se.color || [T.line, T.accent, '#f87171'][i % 3];
       const pts = se.points.map(([x, y]) => [sx(x), sy(y)]);
       return `<path d="${smooth(pts)}" fill="none" stroke="${col}" stroke-width="9" stroke-linecap="round"/>` +
-        (se.label ? `<text x="${pts[pts.length - 1][0] - 10}" y="${pts[pts.length - 1][1] - 22}" text-anchor="end" font-size="30" fill="${col}">${esc(se.label)}</text>` : '');
+        (se.label ? (lp => `<text x="${lp[0] - 10}" y="${lp[1] - 24}" text-anchor="end" font-size="30" fill="${col}">${esc(se.label)}</text>`)(pts[se.labelAt ?? pts.length - 1]) : '');
     }).join('');
     const marks = (s.marks || []).map(m => `<circle cx="${sx(m.x)}" cy="${sy(m.y)}" r="12" fill="${T.accent}"/><text x="${sx(m.x)}" y="${sy(m.y) - 28}" text-anchor="middle" font-size="30" fill="${T.accent}">${esc(m.label)}</text>`).join('');
     return `${head(s)}<svg class=box style="top:400px" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
@@ -60,9 +60,9 @@ const types = {
     }).join('');
     const ly = base - s.limit * unit;
     return `${head(s)}<svg class=box style="top:400px" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+      <line x1="150" y1="${ly}" x2="710" y2="${ly}" stroke="#f87171" stroke-width="4" stroke-dasharray="14 10"/>
       <line x1="200" y1="${base}" x2="740" y2="${base}" stroke="${T.fg}" stroke-width="10" stroke-linecap="round"/>${boxes}
-      <line x1="150" y1="${ly}" x2="790" y2="${ly}" stroke="#f87171" stroke-width="4" stroke-dasharray="14 10"/>
-      <text x="800" y="${ly + 10}" font-size="30" fill="#f87171">${esc(s.limitLabel || '上限')}</text></svg>
+      <text x="720" y="${ly + 10}" font-size="30" fill="#f87171">${esc(s.limitLabel || '上限')}</text></svg>
       ${s.caption ? `<div class="box p" style="top:1000px;font-size:36px">${rich(s.caption)}</div>` : ''}`;
   },
 };
