@@ -1,0 +1,6 @@
+{
+  "name": "carousel-tool",
+  "private": true,
+  "description": "JSONからInstagramカルーセル画像を作るツール(Playwrightは別途必要)",
+  "dependencies": { "@fontsource/noto-serif-jp": "^5.0.0" }
+}
