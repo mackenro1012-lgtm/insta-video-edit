@@ -103,6 +103,18 @@ function eLines(lines, cover) {
     return `<div class="${cls} ${c}">${eRich(t, cover ? '#fff' : E.accent).replace(/\n/g, '<br>')}</div>`;
   }).join('');
 }
+// 小さな線画アイコン(slide.icon: stack / ripple / balance。省略すると何も出ません)
+function eIcon(kind) {
+  const m = E.mid, a = E.accent, st = 'fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+  const wrap = inner => `<svg width="240" height="150" viewBox="0 0 240 150">${inner}</svg>`;
+  if (kind === 'stack') return wrap(`<line x1="10" y1="140" x2="230" y2="140" stroke="${m}" stroke-width="2"/>
+    <rect x="40" y="104" width="150" height="30" rx="4" ${st} stroke="${m}"/><rect x="52" y="68" width="150" height="30" rx="4" ${st} stroke="${m}"/>
+    <rect x="46" y="32" width="150" height="30" rx="4" ${st} stroke="${m}"/><rect x="80" y="4" width="80" height="22" rx="4" ${st} stroke="${a}"/>`);
+  if (kind === 'ripple') return wrap(`<circle cx="120" cy="75" r="7" fill="${a}"/>${[28, 48, 68].map((r, i) => `<circle cx="120" cy="75" r="${r}" ${st} stroke="${m}" opacity="${[0.9, 0.6, 0.35][i]}"/>`).join('')}`);
+  if (kind === 'balance') return wrap(`<line x1="10" y1="124" x2="230" y2="124" stroke="${m}" stroke-width="2"/><polygon points="120,66 98,122 142,122" ${st} stroke="${m}"/>
+    <line x1="24" y1="62" x2="216" y2="62" stroke="${m}" stroke-width="2" stroke-linecap="round"/><circle cx="44" cy="40" r="16" ${st} stroke="${m}"/><circle cx="196" cy="40" r="16" ${st} stroke="${m}"/>`);
+  return '';
+}
 function ePage(s, n, total) {
   const cover = s.variant === 'cover', end = s.variant === 'end' || n === total && s.variant !== 'cover';
   const bg = cover ? E.coverBg : E.bg, line = cover ? 'rgba(255,255,255,.55)' : E.rule, fg = cover ? '#fff' : E.ink;
@@ -127,7 +139,7 @@ body{margin:0;width:1080px;height:1350px;background:${bg};color:${fg};font-famil
 .ef{position:absolute;top:${end ? 1226 : 1256}px;font-size:28px;color:${E.mid};letter-spacing:.06em}
 </style>${deco}
 <div class=hd><i></i><span>${esc(s.label || '')}</span></div><div class=rl></div>
-<div class=bd>${eLines(s.lines || [], cover)}${fig}${s.after ? `<div style="margin-top:20px">${eLines(s.after, cover)}</div>` : ''}</div>${foot}`;
+${s.icon ? `<div style="position:absolute;left:88px;top:${s.iconTop || 1000}px">${eIcon(s.icon)}</div>` : ''}<div class=bd>${eLines(s.lines || [], cover)}${fig}${s.after ? `<div style="margin-top:20px">${eLines(s.after, cover)}</div>` : ''}</div>${foot}`;
 }
 
 (async () => {
